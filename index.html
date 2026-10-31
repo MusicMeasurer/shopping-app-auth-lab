@@ -6,7 +6,7 @@
 <label>Email тестового пользователя<input id="email" type="email" autocomplete="username"></label>
 <label>Пароль<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Войти</button><button id="check">Проверить сессию</button><button id="logout">Выйти</button>
-<h2>Тест № 9 · Data API</h2><p><small>Только чтение. Не создаёт и не изменяет данные.</small></p><button id="testAnon">Анонимный доступ</button><button id="testAuth">Мои списки</button><pre id="apiStatus">Тесты ещё не запускались.</pre><p><small>Отправляй мне только текст результатов из этого блока, без ключей и токенов.</small></p><h2>Тест № 11 · Прямое обращение к чужому списку</h2><p><small>Запусти под пользователем Б. Только чтение, никаких изменений данных.</small></p><button id="directForeign">Проверить чужой UUID</button><pre id="foreignStatus">Тест не запускался.</pre><h2>Тест № 10 · Изоляция пользователей</h2><p><small>Создаёт один тестовый список для текущего аккаунта. Не используй настоящие покупки.</small></p><button id="createList">Создать тестовый список</button><button id="checkLists">Проверить видимые списки</button><pre id="isolationStatus">Тест не запускался.</pre><p><small>После создания списка выйди из аккаунта А и войди под аккаунтом Б для проверки изоляции.</small></p><p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
+<h2>Тест № 9 · Data API</h2><p><small>Только чтение. Не создаёт и не изменяет данные.</small></p><button id="testAnon">Анонимный доступ</button><button id="testAuth">Мои списки</button><pre id="apiStatus">Тесты ещё не запускались.</pre><p><small>Отправляй мне только текст результатов из этого блока, без ключей и токенов.</small></p><h2>Тест № 12 · Запрет чужих изменений</h2><p><small>Запускать только под пользователем Б. Проверяет попытки переименовать чужой список и создать список от имени А. Не изменяет существующие данные при корректной защите.</small></p><button id="foreignWrites">Проверить запреты записи</button><pre id="writesStatus">Тест не запускался.</pre><h2>Тест № 11 · Прямое обращение к чужому списку</h2><p><small>Запусти под пользователем Б. Только чтение, никаких изменений данных.</small></p><button id="directForeign">Проверить чужой UUID</button><pre id="foreignStatus">Тест не запускался.</pre><h2>Тест № 10 · Изоляция пользователей</h2><p><small>Создаёт один тестовый список для текущего аккаунта. Не используй настоящие покупки.</small></p><button id="createList">Создать тестовый список</button><button id="checkLists">Проверить видимые списки</button><pre id="isolationStatus">Тест не запускался.</pre><p><small>После создания списка выйди из аккаунта А и войди под аккаунтом Б для проверки изоляции.</small></p><p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
 <script>
 const base='https://tdcrtwpewbngoermckmx.supabase.co';
 let accessToken=null;
@@ -112,5 +112,29 @@ el('directForeign').onclick=async()=>{
   const leaked=r.body.some(x=>x.id===target);
   el('foreignStatus').textContent='Тест № 11: HTTP '+r.status+'; найдено строк: '+r.body.length+'\n'+(leaked?'ОПАСНО: чужой список доступен!':'УСПЕХ: чужой список не возвращён.')+'\nЗапрос выполнен под другим UUID пользователя.';
  }catch(e){el('foreignStatus').textContent='Ответ/ошибка: '+e.message+'\nТребуется разбор.'}
+};
+
+el('foreignWrites').onclick=async()=>{
+ const out=el('writesStatus'),owner='6dcf24a0-453f-4a9a-a4e0-c9b319f13754',list='f094c0e9-f750-47b0-9fd8-7fcd79fedadc';
+ out.textContent='Проверяю…';
+ el('foreignWrites').disabled=true;
+ try{
+  const u=await call('/auth/v1/user',{headers:{Authorization:'Bearer '+accessToken}});
+  if(u.id===owner){out.textContent='ОСТАНОВЛЕНО: войди под пользователем Б.';return}
+  const key=el('key').value.trim();
+  const send=async(path,method,data)=>{
+   const r=await fetch(base+path,{method,headers:{apikey:key,Authorization:'Bearer '+accessToken,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(data)});
+   const body=await r.json().catch(()=>null);
+   return {status:r.status,body};
+  };
+  const update=await send('/rest/v1/shopping_lists?id=eq.'+list,'PATCH',{name:'UNAUTHORIZED MODIFICATION TEST'});
+  const insert=await send('/rest/v1/shopping_lists?select=id,owner_id','POST',{owner_id:owner,name:'UNAUTHORIZED OWNERSHIP TEST'});
+  const updated=Array.isArray(update.body)?update.body.length:null;
+  const inserted=Array.isArray(insert.body)?insert.body.length:null;
+  const passUpdate=(update.status===403||update.status===401||(update.status===200&&updated===0)||(update.status===204));
+  const passInsert=(insert.status>=400);
+  out.textContent='Тест № 12 (пользователь Б)\nЧужой PATCH: HTTP '+update.status+', строк: '+updated+'\n'+(passUpdate?'Запись не подтверждена':'ТРЕВОГА: проверить изменение!')+'\nСоздать список от имени А: HTTP '+insert.status+', строк: '+inserted+'\n'+(passInsert?'Запрос отклонён':'ТРЕВОГА: возможна подмена владельца!')+'\n'+(passUpdate&&passInsert?'Предварительно: оба запрета сработали.':'Нужен срочный разбор.');
+ }catch(e){out.textContent='Ошибка теста: '+e.message}
+ finally{el('foreignWrites').disabled=false}
 };
 </script></body></html>
