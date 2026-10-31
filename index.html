@@ -186,7 +186,7 @@ el('verifyItem').onclick=async()=>{
 el('pullChanges').onclick=async()=>{
  const out=el('pullStatus');out.textContent='Запрашиваю изменения…';
  try{
-  const r=await authApi('/rest/v1/rpc/pull_item_changes',{method:'POST',body:JSON.stringify({p_list:'f094c0e9-f750-47b0-9fd8-7fcd79fedadc',p_after_revision:0,p_limit:20})});
+  const r=await authApi('/rest/v1/rpc/pull_item_changes',{method:'POST',body:JSON.stringify({p_list:'f094c0e9-f750-47b0-9fd8-7fcd79fedadc',p_after_revision:0,p_page_size:20})});
   out.textContent='HTTP '+r.status+'\n'+JSON.stringify(r.body,null,2);
  }catch(e){out.textContent='Ошибка: '+e.message}
 };
