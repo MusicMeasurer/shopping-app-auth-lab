@@ -6,7 +6,7 @@
 <label>Email тестового пользователя<input id="email" type="email" autocomplete="username"></label>
 <label>Пароль<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Войти</button><button id="check">Проверить сессию</button><button id="logout">Выйти</button>
-<h2>Тест № 9 · Data API</h2><p><small>Только чтение. Не создаёт и не изменяет данные.</small></p><button id="testAnon">Анонимный доступ</button><button id="testAuth">Мои списки</button><pre id="apiStatus">Тесты ещё не запускались.</pre><p><small>Отправляй мне только текст результатов из этого блока, без ключей и токенов.</small></p><h2>Тест № 10 · Изоляция пользователей</h2><p><small>Создаёт один тестовый список для текущего аккаунта. Не используй настоящие покупки.</small></p><button id="createList">Создать тестовый список</button><button id="checkLists">Проверить видимые списки</button><pre id="isolationStatus">Тест не запускался.</pre><p><small>После создания списка выйди из аккаунта А и войди под аккаунтом Б для проверки изоляции.</small></p><p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
+<h2>Тест № 9 · Data API</h2><p><small>Только чтение. Не создаёт и не изменяет данные.</small></p><button id="testAnon">Анонимный доступ</button><button id="testAuth">Мои списки</button><pre id="apiStatus">Тесты ещё не запускались.</pre><p><small>Отправляй мне только текст результатов из этого блока, без ключей и токенов.</small></p><h2>Тест № 11 · Прямое обращение к чужому списку</h2><p><small>Запусти под пользователем Б. Только чтение, никаких изменений данных.</small></p><button id="directForeign">Проверить чужой UUID</button><pre id="foreignStatus">Тест не запускался.</pre><h2>Тест № 10 · Изоляция пользователей</h2><p><small>Создаёт один тестовый список для текущего аккаунта. Не используй настоящие покупки.</small></p><button id="createList">Создать тестовый список</button><button id="checkLists">Проверить видимые списки</button><pre id="isolationStatus">Тест не запускался.</pre><p><small>После создания списка выйди из аккаунта А и войди под аккаунтом Б для проверки изоляции.</small></p><p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
 <script>
 const base='https://tdcrtwpewbngoermckmx.supabase.co';
 let accessToken=null;
@@ -96,5 +96,21 @@ el('checkLists').onclick=async()=>{
   const rows=Array.isArray(result.body)?result.body:null;
   isolationStatus('HTTP '+result.status+'\n'+(rows?'Видимых списков: '+rows.length+'\n'+JSON.stringify(rows,null,2):'Неожиданный формат ответа'));
  }catch(e){isolationStatus('Ошибка чтения: '+e.message)}
+};
+
+el('directForeign').onclick=async()=>{
+ const target='f094c0e9-f750-47b0-9fd8-7fcd79fedadc';
+ el('foreignStatus').textContent='Проверяю прямой доступ…';
+ try{
+  const user=await call('/auth/v1/user',{headers:{Authorization:'Bearer '+accessToken}});
+  if(user.id==='6dcf24a0-453f-4a9a-a4e0-c9b319f13754'){
+   el('foreignStatus').textContent='ОСТАНОВЛЕНО: это пользователь А. Войди под Б.';
+   return;
+  }
+  const r=await authApi('/rest/v1/shopping_lists?select=id,name,owner_id&id=eq.'+target);
+  if(!Array.isArray(r.body))throw Error('Неожиданный ответ');
+  const leaked=r.body.some(x=>x.id===target);
+  el('foreignStatus').textContent='Тест № 11: HTTP '+r.status+'; найдено строк: '+r.body.length+'\n'+(leaked?'ОПАСНО: чужой список доступен!':'УСПЕХ: чужой список не возвращён.')+'\nЗапрос выполнен под другим UUID пользователя.';
+ }catch(e){el('foreignStatus').textContent='Ответ/ошибка: '+e.message+'\nТребуется разбор.'}
 };
 </script></body></html>
