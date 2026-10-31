@@ -6,7 +6,7 @@
 <label>Email тестового пользователя<input id="email" type="email" autocomplete="username"></label>
 <label>Пароль<input id="password" type="password" autocomplete="current-password"></label>
 <button id="login">Войти</button><button id="check">Проверить сессию</button><button id="logout">Выйти</button>
-<p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
+<h2>Тест № 9 · Data API</h2><p><small>Только чтение. Не создаёт и не изменяет данные.</small></p><button id="testAnon">Анонимный доступ</button><button id="testAuth">Мои списки</button><pre id="apiStatus">Тесты ещё не запускались.</pre><p><small>Отправляй мне только текст результатов из этого блока, без ключей и токенов.</small></p><p><small>Ключ, пароль и токен хранятся только в памяти этой вкладки, не записываются в GitHub или localStorage. Не присылайте их в чат. После перезагрузки страницы нужно войти снова.</small></p><pre id="status">Готово к проверке.</pre></main>
 <script>
 const base='https://tdcrtwpewbngoermckmx.supabase.co';
 let accessToken=null;
@@ -34,4 +34,35 @@ el('logout').onclick=async()=>{if(!accessToken){status('Активной сес�
  await call('/auth/v1/logout',{method:'POST',headers:{Authorization:'Bearer '+accessToken}});
  status('Выход выполнен.');
 }catch(e){status('Серверный выход не подтверждён: '+e.message+'\nЛокальный токен очищен.')}finally{accessToken=null;el('password').value=''}};
+
+const apiStatus=t=>{el('apiStatus').textContent=t};
+async function apiGet(path,authenticated){
+ const key=el('key').value.trim();
+ if(!key.startsWith('sb_publishable_'))throw Error('Укажите publishable key');
+ if(authenticated&&!accessToken)throw Error('Сначала войдите');
+ const headers={'apikey':key};
+ if(authenticated)headers.Authorization='Bearer '+accessToken;
+ const response=await fetch(base+path,{method:'GET',headers});
+ const body=await response.json().catch(()=>null);
+ return {status:response.status,body};
+}
+el('testAnon').onclick=async()=>{
+ apiStatus('Проверяю анонимный доступ…');
+ try{
+  const table=await apiGet('/rest/v1/shopping_lists?select=id&limit=1',false);
+  const rpc=await apiGet('/rest/v1/pull_item_changes',false);
+  const tableSafe=Array.isArray(table.body)?'строк: '+table.body.length:'ответ без массива';
+  const rpcSafe=rpc.body&&typeof rpc.body==='object'?(rpc.body.code||rpc.body.message||'ошибка/ответ'):'ответ';
+  apiStatus('Без входа — shopping_lists: HTTP '+table.status+', '+tableSafe+'\nБез входа — pull_item_changes: HTTP '+rpc.status+', '+rpcSafe+'\nОжидаем: нет данных, RPC недоступна.');
+ }catch(e){apiStatus('Ошибка: '+e.message)}
+};
+el('testAuth').onclick=async()=>{
+ apiStatus('Проверяю доступ с JWT…');
+ try{
+  const r=await apiGet('/rest/v1/shopping_lists?select=id,owner_id&limit=20',true);
+  if(!Array.isArray(r.body)){apiStatus('С JWT — HTTP '+r.status+'; код: '+(r.body?.code||'нет')+'; сообщение: '+(r.body?.message||'нет'));return}
+  const ids=r.body.map(x=>({id:x.id,owner_id:x.owner_id}));
+  apiStatus('С JWT — HTTP '+r.status+'; списков: '+r.body.length+'\n'+(ids.length?'ID и owner_id:\n'+JSON.stringify(ids,null,2):'Списков пока нет. Это нормально для нового аккаунта.'));
+ }catch(e){apiStatus('Ошибка: '+e.message)}
+};
 </script></body></html>
